@@ -4,3 +4,4 @@ dist
 .ai/history/
 .ai/embeddings/
 .ai/memory/context.md
+.claude

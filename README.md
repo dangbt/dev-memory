@@ -39,6 +39,54 @@ npm install -g dev-memory
 
 ---
 
+## Auto mode — fully automatic with Claude Code hooks
+
+The recommended setup. Wire `inject` and `compile` as Claude Code hooks so they run automatically — no manual steps needed.
+
+**Add to your project's `.claude/settings.json`:**
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dev-memory inject 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nohup dev-memory compile > /dev/null 2>&1 &"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+To apply globally (all projects), add to `~/.claude/settings.json` instead.
+
+**What happens:**
+
+- `inject` runs before each prompt — writes project memory into `CLAUDE.md`. If already up to date, exits in milliseconds.
+- `compile` runs in the **background** after Claude finishes — extracts new knowledge and saves it to `.ai/memory/`. Makes 2 API calls (< $0.01/session with the default model).
+
+> **nvm users:** Claude Code hooks run without loading your shell profile, so `node` won't be in PATH. Fix by prefixing each command with the node bin directory:
+> ```
+> PATH=/path/to/.nvm/versions/node/vX.Y.Z/bin:$PATH dev-memory inject 2>/dev/null || true
+> ```
+> Find your path with: `nvm which node | xargs dirname`
+
+---
+
 ## Usage — CLI mode
 
 Use this when working in the terminal with `claude`.
@@ -90,107 +138,36 @@ dev-memory -- --resume
 
 ---
 
-## Usage — VSCode extension mode
+## Usage — VSCode extension mode (manual)
 
-Use this when working inside the Claude Code VSCode extension.
-
-The extension doesn't go through the CLI wrapper, so memory is injected via `CLAUDE.md` instead — a file that both the CLI and the extension always read.
-
-### Step-by-step
+Use this when working inside the Claude Code VSCode extension without hooks.
 
 **1. Before opening VSCode (or starting a new conversation)**
 
-Run `inject` from your project root. This writes your project memory into `.ai/memory/context.md` and ensures `CLAUDE.md` imports it:
-
 ```bash
 cd /your/project
-dev-memory inject
-
-# [dev-memory] ✓ Memory injected — CLAUDE.md updated (13 entries)
-```
-
-With a goal (recommended — surfaces the most relevant entries):
-
-```bash
 dev-memory inject --goal "refactor the payment module"
 
 # [dev-memory] ✓ Memory injected — CLAUDE.md updated (13 entries)
-# [dev-memory] Goal context: "refactor the payment module"
 ```
 
 **2. Open your project in VSCode and use Claude normally**
 
-The extension reads `CLAUDE.md` automatically. Your project memory is now part of every conversation context.
+The extension reads `CLAUDE.md` automatically.
 
 **3. After your session — compile new knowledge**
-
-Run `compile` from your project root. It finds the latest session transcript written by the extension and extracts new knowledge into `.ai/memory/`:
 
 ```bash
 dev-memory compile
 
-# [dev-memory] Looking for recent Claude sessions...
-# [dev-memory] Compiling session into memory...
 # [dev-memory] ✓ Memory updated — 3 new entries saved to .ai/memory/
 ```
 
-**4. Next session — re-inject to pick up the new entries**
+**4. Next session — re-inject**
 
 ```bash
 dev-memory inject --goal "..."
 ```
-
-That's the full cycle.
-
----
-
-### Auto mode — fully automatic with Claude Code hooks
-
-Instead of running `inject` and `compile` manually, you can wire them up as Claude Code hooks so they run automatically inside the extension.
-
-**Step 1 — Copy the hooks config into your project**
-
-```bash
-mkdir -p .claude
-```
-
-Or add this to your project's `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "dev-memory inject 2>/dev/null || true"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "nohup dev-memory compile > /dev/null 2>&1 &"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-**Step 2 — Done**
-
-- `inject` runs before each prompt. If `context.md` is already up to date, it exits in milliseconds — no unnecessary work.
-- `compile` runs in the **background** after Claude finishes (`nohup ... &`), so it doesn't block your workflow. It makes 2 API calls to the Anthropic API — typically < $0.01 per session with the default model.
-
-To apply the same hooks globally (all projects), add them to `~/.claude/settings.json` instead.
-
----
 
 ### inject flags
 
@@ -295,7 +272,7 @@ Claude exited before writing any messages (e.g. immediate Ctrl+C). Nothing to co
 
 **`No new sessions found — already up to date`** (from `dev-memory compile`)
 
-All session transcripts in `~/.claude/projects/<your-project>/` have already been compiled. This is the expected message after the first `compile` if no new extension session has run since then.
+All session transcripts in `~/.claude/projects/<your-project>/` have already been compiled.
 
 **`better-sqlite3 failed to load`**
 
@@ -319,4 +296,16 @@ DevMemory resolves `claude` using `type -P claude` (bypasses shell aliases). Ens
 ```bash
 which claude          # should return a path
 claude --version      # should show version
+```
+
+**Hooks not running (nvm users)**
+
+Claude Code hooks run without loading your shell profile, so `node` is not in PATH. Find your node bin directory:
+```bash
+nvm which node | xargs dirname
+# e.g. /Users/you/.nvm/versions/node/v22.19.0/bin
+```
+Then prefix each hook command:
+```
+PATH=/Users/you/.nvm/versions/node/v22.19.0/bin:$PATH dev-memory inject 2>/dev/null || true
 ```
