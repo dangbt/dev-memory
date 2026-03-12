@@ -5,6 +5,8 @@ import { execa } from 'execa';
 import path from 'path';
 import os from 'os';
 import fs from 'fs-extra';
+import { createRequire } from 'module';
+import updateNotifier from 'update-notifier';
 import { ContextLoader } from '../engine/context-loader.js';
 import { SessionRecorder } from '../engine/session-recorder.js';
 import { MemoryCompiler } from '../engine/memory-compiler.js';
@@ -157,6 +159,10 @@ program
   }) => {
     await runSession(claudeArgs, opts);
   });
+
+const _require = createRequire(import.meta.url);
+const pkg = _require('../../package.json') as { name: string; version: string };
+updateNotifier({ pkg }).notify();
 
 program.parse();
 
