@@ -1,5 +1,8 @@
 # DevMemory
 
+[![npm version](https://img.shields.io/npm/v/dev-memory)](https://www.npmjs.com/package/dev-memory)
+[![license](https://img.shields.io/npm/l/dev-memory)](LICENSE)
+
 Persistent memory layer for Claude Code sessions — works with both the **CLI** and the **VSCode extension**.
 
 ---
@@ -31,10 +34,7 @@ Memory is stored as plain Markdown files in `.ai/memory/` — readable, diffable
 **Install**
 
 ```bash
-git clone <repo> dev-memory
-cd dev-memory
-pnpm install
-pnpm link          # makes `dev-memory` available globally
+npm install -g dev-memory
 ```
 
 ---
@@ -152,7 +152,6 @@ Instead of running `inject` and `compile` manually, you can wire them up as Clau
 
 ```bash
 mkdir -p .claude
-cp /path/to/dev-memory/.claude/settings.json .claude/settings.json
 ```
 
 Or add this to your project's `.claude/settings.json`:
@@ -304,7 +303,7 @@ On macOS, ensure Xcode Command Line Tools are installed:
 ```bash
 xcode-select --install
 ```
-Then reinstall: `pnpm install`
+Then reinstall: `npm install -g dev-memory`
 
 **Memory not loading for a project**
 
