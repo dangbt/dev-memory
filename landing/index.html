@@ -5,9 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DevMemory — Persistent memory for Claude Code</title>
   <meta name="description" content="DevMemory gives Claude Code persistent memory across sessions. Your project context, decisions, and lessons — always loaded, automatically updated." />
+  <meta name="keywords" content="Claude Code, AI memory, developer tools, Claude CLI, VSCode extension, persistent memory, Claude AI, coding assistant" />
+  <meta name="author" content="Bui Tan Dang" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://dev-memory.pages.dev" />
+
+  <!-- Open Graph -->
   <meta property="og:title" content="DevMemory — Persistent memory for Claude Code" />
-  <meta property="og:description" content="Claude Code forgets everything when you close the tab. DevMemory fixes that." />
+  <meta property="og:description" content="Claude Code forgets everything when you close the tab. DevMemory fixes that — automatically saves what Claude learns and loads it back every session." />
   <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://dev-memory.pages.dev" />
+  <meta property="og:site_name" content="DevMemory" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="DevMemory — Persistent memory for Claude Code" />
+  <meta name="twitter:description" content="Claude Code forgets everything when you close the tab. DevMemory fixes that." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%237c6aff'/><text y='72' x='50' text-anchor='middle' font-size='58' font-family='system-ui,sans-serif' font-weight='700' fill='white'>dm</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -543,6 +557,11 @@
     }]
   }
 }</pre>
+            <p style="margin-top:0.75rem; font-size:0.8rem; color: var(--muted);">
+              <strong style="color:#e8e8f0">nvm users:</strong> hooks run without loading your shell profile, so <code>node</code> won't be in PATH. Prefix each command with your node bin directory:<br />
+              <code style="display:block; margin-top:0.4rem; font-size:0.75rem; padding:0.5rem 0.75rem; white-space:pre-wrap;">PATH=$(nvm which node | xargs dirname):$PATH dev-memory inject 2>/dev/null || true</code>
+              Find your path: <code>nvm which node | xargs dirname</code>
+            </p>
           </div>
         </div>
         <div class="step">
