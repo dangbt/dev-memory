@@ -1,2 +1,6 @@
 node_modules
 dist
+# dev-memory — generated files
+.ai/history/
+.ai/embeddings/
+.ai/memory/context.md
