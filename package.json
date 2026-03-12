@@ -1,6 +1,6 @@
 {
   "name": "dev-memory",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Persistent memory layer for Claude Code sessions",
   "type": "module",
   "bin": {
