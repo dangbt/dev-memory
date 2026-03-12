@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevMemory — Persistent memory for Claude Code</title>
+  <meta name="description" content="DevMemory gives Claude Code persistent memory across sessions. Your project context, decisions, and lessons — always loaded, automatically updated." />
+  <meta property="og:title" content="DevMemory — Persistent memory for Claude Code" />
+  <meta property="og:description" content="Claude Code forgets everything when you close the tab. DevMemory fixes that." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #18181f;
+      --border: rgba(255,255,255,0.08);
+      --text: #e8e8f0;
+      --muted: #7878a0;
+      --accent: #7c6aff;
+      --accent2: #a78bfa;
+      --green: #34d399;
+      --radius: 12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem;
+      height: 60px;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+    .nav-logo span { color: var(--accent2); }
+    .nav-links { display: flex; gap: 2rem; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: 0.875rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: #fff; border: none;
+      padding: 0.45rem 1.1rem; border-radius: 8px; font-size: 0.875rem;
+      font-weight: 500; cursor: pointer; text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.85; }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 20%, rgba(124,106,255,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(124,106,255,0.12); border: 1px solid rgba(124,106,255,0.25);
+      color: var(--accent2); font-size: 0.8rem; font-weight: 500;
+      padding: 0.3rem 0.9rem; border-radius: 99px;
+      margin-bottom: 1.5rem;
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green); animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      max-width: 800px;
+      margin-bottom: 1.5rem;
+    }
+    h1 .accent { color: var(--accent2); }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--muted);
+      max-width: 520px;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-actions {
+      display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 3.5rem;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff; border: none;
+      padding: 0.75rem 1.75rem; border-radius: var(--radius);
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      text-decoration: none; transition: opacity 0.2s, transform 0.15s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+      padding: 0.75rem 1.75rem; border-radius: var(--radius);
+      font-size: 0.95rem; font-weight: 500; cursor: pointer;
+      text-decoration: none; transition: background 0.2s, transform 0.15s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-secondary:hover { background: #222230; transform: translateY(-1px); }
+
+    /* Terminal */
+    .terminal {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 100%; max-width: 620px;
+      overflow: hidden; text-align: left;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .terminal-bar {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #ff5f56; }
+    .dot-y { background: #ffbd2e; }
+    .dot-g { background: #27c93f; }
+    .terminal-body { padding: 1.25rem 1.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.8; }
+    .t-prompt { color: var(--accent2); }
+    .t-cmd { color: var(--text); }
+    .t-out { color: var(--muted); }
+    .t-ok { color: var(--green); }
+    .t-dim { color: #4a4a6a; }
+
+    /* SECTION */
+    section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
+
+    .section-label {
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent2);
+      margin-bottom: 1rem;
+    }
+    h2 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700; letter-spacing: -0.02em;
+      line-height: 1.15; margin-bottom: 1rem;
+    }
+    .section-sub {
+      font-size: 1.05rem; color: var(--muted);
+      max-width: 540px; margin-bottom: 3rem;
+    }
+
+    /* PROBLEM */
+    .problem-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem; margin-top: 2rem;
+    }
+    .problem-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+    }
+    .problem-card .icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+    .problem-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .problem-card p { font-size: 0.875rem; color: var(--muted); }
+
+    /* HOW IT WORKS */
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1.5rem; align-items: center;
+      margin-top: 3rem;
+    }
+    .flow-box {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+    }
+    .flow-box h3 { font-size: 0.875rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+    .flow-item {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .flow-item:last-child { border-bottom: none; }
+    .flow-item-icon { color: var(--accent2); font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+    .flow-arrow {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.5rem; color: var(--accent2);
+    }
+    .flow-arrow span { font-size: 1.5rem; }
+    .flow-arrow small { font-size: 0.7rem; color: var(--muted); text-align: center; width: 80px; }
+
+    /* FEATURES */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem; margin-top: 1rem;
+    }
+    .feature-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.75rem;
+      transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: rgba(124,106,255,0.35); }
+    .feature-icon {
+      width: 42px; height: 42px;
+      background: rgba(124,106,255,0.12); border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; margin-bottom: 1rem;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .feature-card p { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+
+    /* QUICKSTART */
+    .quickstart-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 2rem; margin-top: 2rem;
+    }
+    @media (max-width: 768px) { .quickstart-grid { grid-template-columns: 1fr; } }
+    .step {
+      display: flex; gap: 1rem;
+    }
+    .step-num {
+      width: 32px; height: 32px; flex-shrink: 0;
+      background: rgba(124,106,255,0.15); border: 1px solid rgba(124,106,255,0.3);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700; color: var(--accent2);
+    }
+    .step-content h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .step-content p { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem; }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: var(--bg3); border: 1px solid var(--border);
+      padding: 0.15rem 0.5rem; border-radius: 5px; color: var(--accent2);
+    }
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      background: var(--bg3); border: 1px solid var(--border);
+      padding: 1rem 1.25rem; border-radius: var(--radius);
+      line-height: 1.8; overflow-x: auto; color: var(--text);
+    }
+    pre .c { color: var(--muted); }
+    pre .k { color: var(--accent2); }
+    pre .s { color: var(--green); }
+
+    /* MEMORY TYPES */
+    .memory-types {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem; margin-top: 2rem;
+    }
+    .memory-type {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem;
+    }
+    .memory-type-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; color: var(--accent2); font-weight: 500;
+      margin-bottom: 0.4rem;
+    }
+    .memory-type h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .memory-type p { font-size: 0.8rem; color: var(--muted); }
+
+    /* CTA */
+    .cta-section {
+      text-align: center; padding: 6rem 2rem;
+      background: linear-gradient(180deg, transparent, rgba(124,106,255,0.05));
+      border-top: 1px solid var(--border);
+    }
+    .cta-section h2 { margin-bottom: 0.75rem; }
+    .cta-section p { color: var(--muted); margin-bottom: 2rem; }
+
+    /* FOOTER */
+    footer {
+      text-align: center; padding: 2rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem; color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 700px) {
+      .flow { grid-template-columns: 1fr; }
+      .flow-arrow { flex-direction: row; }
+      .flow-arrow span { transform: rotate(90deg); }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">dev<span>memory</span></div>
+  <div class="nav-links">
+    <a href="#how-it-works">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#quickstart">Quickstart</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/dangbt/dev-memory" target="_blank">GitHub →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge">
+    <span class="badge-dot"></span>
+    Works with Claude Code CLI &amp; VSCode Extension
+  </div>
+  <h1>Claude Code gets a<br /><span class="accent">persistent memory</span></h1>
+  <p class="hero-sub">
+    Claude forgets everything when you close the tab.
+    DevMemory automatically saves what it learns — and loads it back every session.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="#quickstart">
+      Get started
+    </a>
+    <a class="btn-secondary" href="https://github.com/dangbt/dev-memory" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      View on GitHub
+    </a>
+  </div>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span class="dot dot-r"></span>
+      <span class="dot dot-y"></span>
+      <span class="dot dot-g"></span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="t-prompt">$</span> <span class="t-cmd">npm install -g dev-memory</span></div>
+      <div class="t-dim">— install once, works everywhere —</div>
+      <br />
+      <div><span class="t-prompt">$</span> <span class="t-cmd">dev-memory --goal "implement rate limiting"</span></div>
+      <br />
+      <div class="t-out">[dev-memory] Loaded <strong style="color:#e8e8f0">17 memory entries</strong> (3 matched goal)</div>
+      <div class="t-out">[dev-memory] Starting Claude Code session...</div>
+      <br />
+      <div class="t-dim">  ← Claude works with full project context →</div>
+      <br />
+      <div class="t-out">[dev-memory] Session ended. Compiling memory...</div>
+      <div class="t-ok">[dev-memory] ✓ Memory updated — 5 new entries saved</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section>
+  <p class="section-label">The problem</p>
+  <h2>Every session starts from zero</h2>
+  <p class="section-sub">You spend the first 10 minutes re-explaining your project architecture. Every. Single. Time.</p>
+  <div class="problem-grid">
+    <div class="problem-card">
+      <div class="icon">🧠</div>
+      <h3>No context between sessions</h3>
+      <p>Claude doesn't remember your architecture decisions, past bugs, or project conventions — you have to re-explain everything each time.</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon">🔄</div>
+      <h3>Repeating the same mistakes</h3>
+      <p>Without memory, Claude can't learn from past debugging sessions. It'll suggest the same bad fix it already tried last week.</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon">📋</div>
+      <h3>Manual context dumps</h3>
+      <p>Pasting your README or copying context into every conversation is tedious and wastes tokens on irrelevant information.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works" style="padding-top: 0;">
+  <p class="section-label">How it works</p>
+  <h2>Automatic. No extra steps.</h2>
+  <p class="section-sub">DevMemory hooks into Claude Code — before and after each session.</p>
+
+  <div class="flow">
+    <div class="flow-box">
+      <h3>Before session</h3>
+      <div class="flow-item">
+        <span class="flow-item-icon">📂</span>
+        <span>Load <code>.ai/memory/*.md</code></span>
+      </div>
+      <div class="flow-item">
+        <span class="flow-item-icon">🔍</span>
+        <span>TF-IDF search by session goal</span>
+      </div>
+      <div class="flow-item">
+        <span class="flow-item-icon">💉</span>
+        <span>Inject relevant context into Claude</span>
+      </div>
+    </div>
+    <div class="flow-arrow">
+      <span>⟶</span>
+      <small>session runs</small>
+    </div>
+    <div class="flow-box">
+      <h3>After session</h3>
+      <div class="flow-item">
+        <span class="flow-item-icon">📄</span>
+        <span>Parse Claude's JSONL transcript</span>
+      </div>
+      <div class="flow-item">
+        <span class="flow-item-icon">✂️</span>
+        <span>Summarize → extract knowledge</span>
+      </div>
+      <div class="flow-item">
+        <span class="flow-item-icon">💾</span>
+        <span>Append to <code>.ai/memory/*.md</code></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" style="padding-top: 2rem;">
+  <p class="section-label">Features</p>
+  <h2>Built for developer workflows</h2>
+  <p class="section-sub">Lightweight, offline-capable, and git-friendly.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Zero-latency inject</h3>
+      <p>Memory is already on disk as Markdown. If context is fresh, inject exits in milliseconds — no API calls, no waiting.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔌</div>
+      <h3>Hooks-native auto mode</h3>
+      <p>Wire inject and compile as Claude Code hooks. Memory loads before every prompt and compiles in the background when done.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📦</div>
+      <h3>No external dependencies</h3>
+      <p>TF-IDF search via <code>natural</code> + SQLite. No ONNX runtime, no 100MB model downloads, no API keys for search.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📁</div>
+      <h3>Plain Markdown storage</h3>
+      <p>Memory lives in <code>.ai/memory/*.md</code>. Readable, diffable, committable. No proprietary formats or locked databases.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Goal-based relevance</h3>
+      <p>Pass a session goal and DevMemory surfaces only the most relevant entries — less noise in context, more focused Claude.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔀</div>
+      <h3>CLI + VSCode extension</h3>
+      <p>Works via the <code>dev-memory</code> wrapper in terminal, or via CLAUDE.md injection for the VSCode extension.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MEMORY TYPES -->
+<section style="padding-top: 2rem;">
+  <p class="section-label">Memory structure</p>
+  <h2>Four types of memory</h2>
+  <p class="section-sub">Claude automatically categorises what it learns into structured files.</p>
+  <div class="memory-types">
+    <div class="memory-type">
+      <div class="memory-type-label">architecture.md</div>
+      <h3>Architecture</h3>
+      <p>System design decisions, patterns, and structural choices.</p>
+    </div>
+    <div class="memory-type">
+      <div class="memory-type-label">decisions.md</div>
+      <h3>Decisions</h3>
+      <p>Why you chose X over Y. Rationale that future sessions can rely on.</p>
+    </div>
+    <div class="memory-type">
+      <div class="memory-type-label">bugs.md</div>
+      <h3>Bugs</h3>
+      <p>Issues found and how they were fixed — prevent re-investigating the same root causes.</p>
+    </div>
+    <div class="memory-type">
+      <div class="memory-type-label">learnings.md</div>
+      <h3>Learnings</h3>
+      <p>Gotchas, non-obvious behaviours, and key insights from real sessions.</p>
+    </div>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<section id="quickstart" style="padding-top: 2rem;">
+  <p class="section-label">Quickstart</p>
+  <h2>Up and running in 2 minutes</h2>
+  <p class="section-sub">Choose between fully automatic (hooks) or manual mode.</p>
+
+  <div class="quickstart-grid">
+    <div>
+      <h3 style="font-size:1rem; font-weight:600; margin-bottom:1.5rem; color: var(--accent2);">Option A — Auto mode (recommended)</h3>
+      <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Install</h3>
+            <p>Install globally via npm.</p>
+            <pre>npm install -g dev-memory</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Add hooks to your project</h3>
+            <p>Create or update <code>.claude/settings.json</code>:</p>
+            <pre>{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"UserPromptSubmit"</span>: [{
+      <span class="k">"hooks"</span>: [{
+        <span class="k">"type"</span>: <span class="s">"command"</span>,
+        <span class="k">"command"</span>: <span class="s">"dev-memory inject 2>/dev/null || true"</span>
+      }]
+    }],
+    <span class="k">"Stop"</span>: [{
+      <span class="k">"hooks"</span>: [{
+        <span class="k">"type"</span>: <span class="s">"command"</span>,
+        <span class="k">"command"</span>: <span class="s">"nohup dev-memory compile > /dev/null 2>&1 &"</span>
+      }]
+    }]
+  }
+}</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Done</h3>
+            <p>Memory loads before every prompt. Knowledge compiles in the background after each session.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-size:1rem; font-weight:600; margin-bottom:1.5rem; color: var(--muted);">Option B — Manual / CLI mode</h3>
+      <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Install</h3>
+            <pre>npm install -g dev-memory</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Start a session</h3>
+            <p>Run from any project directory.</p>
+            <pre>dev-memory --goal "fix auth bug"</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Inject for VSCode</h3>
+            <p>Before opening VSCode:</p>
+            <pre>dev-memory inject --goal "..."</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Compile after VSCode session</h3>
+            <pre>dev-memory compile</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <h2>Give Claude Code a memory</h2>
+  <p>Open source. MIT licensed. Under 500 lines of TypeScript.</p>
+  <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+    <a class="btn-primary" href="https://github.com/dangbt/dev-memory" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      View on GitHub
+    </a>
+    <a class="btn-secondary" href="https://www.npmjs.com/package/dev-memory" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0v16h16V0H0zm1 1h14v14H1V1zm1 1v12h6V8H5V2H2zm2 2h2v2H4V4zm2 2H4v6h2v-4h2v4h2V2H8v6H6V6z"/></svg>
+      npm package
+    </a>
+  </div>
+</div>
+
+<footer>
+  <p>
+    MIT License · Made by <a href="https://github.com/dangbt" target="_blank">dangbt</a> ·
+    <a href="https://github.com/dangbt/dev-memory" target="_blank">GitHub</a> ·
+    <a href="https://www.npmjs.com/package/dev-memory" target="_blank">npm</a>
+  </p>
+</footer>
+
+</body>
+</html>

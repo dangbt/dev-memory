@@ -2,6 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/dev-memory)](https://www.npmjs.com/package/dev-memory)
 [![license](https://img.shields.io/npm/l/dev-memory)](LICENSE)
+[![website](https://img.shields.io/badge/website-dev--memory.pages.dev-7c6aff)](https://dev-memory.pages.dev)
 
 Persistent memory layer for Claude Code sessions — works with both the **CLI** and the **VSCode extension**.
 
