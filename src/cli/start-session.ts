@@ -417,9 +417,7 @@ async function initAiDir(projectRoot: string): Promise<void> {
 async function ensureGitignore(projectRoot: string): Promise<void> {
   const gitignorePath = path.join(projectRoot, '.gitignore');
   const requiredEntries = [
-    '.ai/history/',
-    '.ai/embeddings/',
-    '.ai/memory/context.md',
+    '.ai/*',
   ];
 
   let content = '';
