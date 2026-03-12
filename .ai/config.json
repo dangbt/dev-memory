@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "project": {
+    "name": "dev-memory"
+  },
+  "model": "claude-sonnet-4-6",
+  "maxMemoryEntriesPerType": 50
+}

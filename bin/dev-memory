@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import { spawnSync } from 'child_process';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const tsxBin = resolve(__dirname, '..', 'node_modules', '.bin', 'tsx');
+const entry = resolve(__dirname, '..', 'src', 'cli', 'start-session.ts');
+
+const result = spawnSync(tsxBin, [entry, ...process.argv.slice(2)], { stdio: 'inherit' });
+process.exit(result.status ?? 1);
