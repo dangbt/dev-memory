@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "dev-memory compile 2>/dev/null || true"
+            "command": "nohup dev-memory compile > /dev/null 2>&1 &"
           }
         ]
       }

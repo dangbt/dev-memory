@@ -330,7 +330,8 @@ async function findLatestUncompiledSession(
   projectRoot: string,
   verbose?: boolean
 ): Promise<string | null> {
-  const encoded = projectRoot.replace(/\//g, '-');
+  // Claude encodes the project path by replacing every path separator with '-'
+  const encoded = projectRoot.replace(/[/\\]/g, '-');
   const sessionDir = path.join(os.homedir(), '.claude', 'projects', encoded);
   const historyDir = path.join(projectRoot, '.ai', 'history');
 
@@ -379,6 +380,7 @@ async function findLatestUncompiledSession(
 
 /**
  * Create the .ai/ project structure on first use.
+ * Also ensures .gitignore excludes generated/large files.
  */
 async function initAiDir(projectRoot: string): Promise<void> {
   const aiDir = path.join(projectRoot, '.ai');
@@ -398,18 +400,53 @@ async function initAiDir(projectRoot: string): Promise<void> {
       maxMemoryEntriesPerType: 50,
     }, { spaces: 2 });
   }
+
+  await ensureGitignore(projectRoot);
+}
+
+/**
+ * Ensure the project .gitignore excludes generated dev-memory files.
+ * Only adds entries that are not already present.
+ */
+async function ensureGitignore(projectRoot: string): Promise<void> {
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+  const requiredEntries = [
+    '.ai/history/',
+    '.ai/embeddings/',
+    '.ai/memory/context.md',
+  ];
+
+  let content = '';
+  if (await fs.pathExists(gitignorePath)) {
+    content = await fs.readFile(gitignorePath, 'utf-8');
+  }
+
+  const missing = requiredEntries.filter(e => !content.includes(e));
+  if (missing.length === 0) return;
+
+  const block = '\n# dev-memory — generated files\n' + missing.join('\n') + '\n';
+  await fs.appendFile(gitignorePath, block, 'utf-8');
 }
 
 /**
  * Find the real Claude CLI binary, bypassing shell aliases.
+ * Supports macOS/Linux (type -P) and Windows (where.exe).
  */
 async function resolveClaudeBin(): Promise<string> {
+  const isWindows = process.platform === 'win32';
+
   try {
-    const { stdout } = await execa('bash', ['-c', 'type -P claude']);
-    const bin = stdout.trim();
-    return bin || '/usr/local/bin/claude';
+    if (isWindows) {
+      const { stdout } = await execa('where.exe', ['claude']);
+      const bin = stdout.trim().split('\n')[0].trim();
+      return bin || 'claude';
+    } else {
+      const { stdout } = await execa('bash', ['-c', 'type -P claude']);
+      const bin = stdout.trim();
+      return bin || '/usr/local/bin/claude';
+    }
   } catch {
-    return '/usr/local/bin/claude';
+    return isWindows ? 'claude' : '/usr/local/bin/claude';
   }
 }
 

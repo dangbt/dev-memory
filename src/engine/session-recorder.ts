@@ -175,7 +175,7 @@ export class SessionRecorder {
    * e.g. /Users/alice/project → -Users-alice-project
    */
   private getSessionDir(): string {
-    const encoded = this.projectRoot.replace(/\//g, '-');
+    const encoded = this.projectRoot.replace(/[/\\]/g, '-');
     return path.join(os.homedir(), '.claude', 'projects', encoded);
   }
 }

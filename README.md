@@ -175,7 +175,7 @@ Or add this to your project's `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "dev-memory compile 2>/dev/null || true"
+            "command": "nohup dev-memory compile > /dev/null 2>&1 &"
           }
         ]
       }
@@ -186,8 +186,8 @@ Or add this to your project's `.claude/settings.json`:
 
 **Step 2 — Done**
 
-- `inject` now runs automatically before each prompt. It checks whether `context.md` is already newer than the memory files — if nothing changed, it exits immediately (no unnecessary work).
-- `compile` runs automatically when Claude finishes responding, extracting new knowledge into `.ai/memory/`.
+- `inject` runs before each prompt. If `context.md` is already up to date, it exits in milliseconds — no unnecessary work.
+- `compile` runs in the **background** after Claude finishes (`nohup ... &`), so it doesn't block your workflow. It makes 2 API calls to the Anthropic API — typically < $0.01 per session with the default model.
 
 To apply the same hooks globally (all projects), add them to `~/.claude/settings.json` instead.
 
