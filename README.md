@@ -1,20 +1,6 @@
 # DevMemory
 
-Persistent memory layer for Claude Code sessions.
-
-DevMemory wraps the Claude CLI so every session automatically loads project knowledge from previous sessions — and saves new knowledge when the session ends.
-
-```
-dev-memory --goal "implement auth middleware"
-
-[dev-memory] Loaded 13 memory entries (2 matched goal)
-[dev-memory] Starting Claude Code session...
-
-  ← Claude runs normally, but with your project memory as context →
-
-[dev-memory] Session ended. Compiling memory...
-[dev-memory] ✓ Memory updated — 4 new entries saved to .ai/memory/
-```
+Persistent memory layer for Claude Code sessions — works with both the **CLI** and the **VSCode extension**.
 
 ---
 
@@ -26,8 +12,8 @@ Before session                     After session
 Load .ai/memory/*.md          →    Parse ~/.claude/projects/<id>.jsonl
 TF-IDF search by goal         →    Summarize transcript (Claude API)
 Build system prompt           →    Extract structured knowledge
-Inject via --append-system-   →    Append to .ai/memory/*.md
-  prompt into Claude          →    Rebuild TF-IDF index (SQLite)
+Inject into Claude            →    Append to .ai/memory/*.md
+                                   Rebuild TF-IDF index (SQLite)
 ```
 
 Memory is stored as plain Markdown files in `.ai/memory/` — readable, diffable, committable.
@@ -45,62 +31,54 @@ Memory is stored as plain Markdown files in `.ai/memory/` — readable, diffable
 **Install**
 
 ```bash
-# Clone or copy into your tools directory
 git clone <repo> dev-memory
 cd dev-memory
-pnpm install        # or npm install / yarn install
-```
-
-**Make it globally available**
-
-```bash
-# Option A — npm link
-npm link
-
-# Option B — add to PATH directly
-echo 'export PATH="/path/to/dev-memory/src/cli:$PATH"' >> ~/.zshrc
-
-# Option C — alias in ~/.zshrc
-alias claude="npx tsx /path/to/dev-memory/src/cli/start-session.ts"
+pnpm install
+pnpm link          # makes `dev-memory` available globally
 ```
 
 ---
 
-## Usage
+## Usage — CLI mode
 
-### Basic — start a Claude session with memory
+Use this when working in the terminal with `claude`.
+
+DevMemory wraps the Claude CLI, injecting project memory before the session starts and compiling new knowledge when it ends.
 
 ```bash
 # From inside any project directory
 dev-memory
-```
 
-### With a session goal (recommended)
-
-Providing a goal enables TF-IDF search to surface the most relevant memory entries for your current task.
-
-```bash
+# With a session goal (recommended — improves memory relevance via TF-IDF)
 dev-memory --goal "add pagination to the user list API"
 dev-memory --goal "debug the flaky auth token expiry test"
-dev-memory --goal "refactor the payment module to use the new SDK"
 ```
 
-### Pass arguments through to Claude
+**Example output**
 
-Any arguments after `--` (or unknown flags) are forwarded to the Claude CLI.
+```
+dev-memory --goal "implement auth middleware"
+
+[dev-memory] Loaded 13 memory entries (2 matched goal)
+[dev-memory] Starting Claude Code session...
+
+  ← Claude runs normally, but with your project memory as context →
+
+[dev-memory] Session ended. Compiling memory...
+[dev-memory] ✓ Memory updated — 4 new entries saved to .ai/memory/
+```
+
+**Pass arguments through to Claude**
+
+Any unknown flags are forwarded to the Claude CLI:
 
 ```bash
-# Start in a specific worktree
 dev-memory --goal "fix bug" -- --worktree
-
-# Use a specific model
 dev-memory -- --model claude-opus-4-6
-
-# Resume a previous Claude session
 dev-memory -- --resume
 ```
 
-### Flags
+**Flags**
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -112,27 +90,157 @@ dev-memory -- --resume
 
 ---
 
+## Usage — VSCode extension mode
+
+Use this when working inside the Claude Code VSCode extension.
+
+The extension doesn't go through the CLI wrapper, so memory is injected via `CLAUDE.md` instead — a file that both the CLI and the extension always read.
+
+### Step-by-step
+
+**1. Before opening VSCode (or starting a new conversation)**
+
+Run `inject` from your project root. This writes your project memory into `.ai/memory/context.md` and ensures `CLAUDE.md` imports it:
+
+```bash
+cd /your/project
+dev-memory inject
+
+# [dev-memory] ✓ Memory injected — CLAUDE.md updated (13 entries)
+```
+
+With a goal (recommended — surfaces the most relevant entries):
+
+```bash
+dev-memory inject --goal "refactor the payment module"
+
+# [dev-memory] ✓ Memory injected — CLAUDE.md updated (13 entries)
+# [dev-memory] Goal context: "refactor the payment module"
+```
+
+**2. Open your project in VSCode and use Claude normally**
+
+The extension reads `CLAUDE.md` automatically. Your project memory is now part of every conversation context.
+
+**3. After your session — compile new knowledge**
+
+Run `compile` from your project root. It finds the latest session transcript written by the extension and extracts new knowledge into `.ai/memory/`:
+
+```bash
+dev-memory compile
+
+# [dev-memory] Looking for recent Claude sessions...
+# [dev-memory] Compiling session into memory...
+# [dev-memory] ✓ Memory updated — 3 new entries saved to .ai/memory/
+```
+
+**4. Next session — re-inject to pick up the new entries**
+
+```bash
+dev-memory inject --goal "..."
+```
+
+That's the full cycle.
+
+---
+
+### Auto mode — fully automatic with Claude Code hooks
+
+Instead of running `inject` and `compile` manually, you can wire them up as Claude Code hooks so they run automatically inside the extension.
+
+**Step 1 — Copy the hooks config into your project**
+
+```bash
+mkdir -p .claude
+cp /path/to/dev-memory/.claude/settings.json .claude/settings.json
+```
+
+Or add this to your project's `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dev-memory inject 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dev-memory compile 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Step 2 — Done**
+
+- `inject` now runs automatically before each prompt. It checks whether `context.md` is already newer than the memory files — if nothing changed, it exits immediately (no unnecessary work).
+- `compile` runs automatically when Claude finishes responding, extracting new knowledge into `.ai/memory/`.
+
+To apply the same hooks globally (all projects), add them to `~/.claude/settings.json` instead.
+
+---
+
+### inject flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-g, --goal <text>` | Current session goal (improves relevance) | — |
+| `-d, --project-dir <path>` | Project root (where `.ai/` lives) | `cwd` |
+| `-v, --verbose` | Show detailed progress logs | off |
+
+### compile flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-d, --project-dir <path>` | Project root (where `.ai/` lives) | `cwd` |
+| `-v, --verbose` | Show detailed progress logs | off |
+
+---
+
 ## Project structure
 
-Running `dev-memory` for the first time in a project creates:
+Running `dev-memory` or `dev-memory inject` for the first time in a project creates:
 
 ```
 your-project/
+├── CLAUDE.md                    ← @.ai/memory/context.md added here
 └── .ai/
-    ├── config.json          ← project config
+    ├── config.json              ← project config
     ├── memory/
-    │   ├── architecture.md  ← architectural decisions & patterns
-    │   ├── decisions.md     ← important decisions & rationale
-    │   ├── bugs.md          ← bugs found and how they were fixed
-    │   └── learnings.md     ← key insights, gotchas, lessons learned
+    │   ├── context.md           ← generated: full context injected into CLAUDE.md
+    │   ├── architecture.md      ← architectural decisions & patterns
+    │   ├── decisions.md         ← important decisions & rationale
+    │   ├── bugs.md              ← bugs found and how they were fixed
+    │   └── learnings.md         ← key insights, gotchas, lessons learned
     ├── history/
-    │   └── <uuid>.json      ← raw session transcripts
+    │   └── <uuid>.json          ← raw session transcripts (auto-saved)
     └── embeddings/
-        └── store.db         ← TF-IDF index (SQLite)
+        └── store.db             ← TF-IDF index (SQLite)
 ```
 
-Add `.ai/history/` and `.ai/embeddings/` to `.gitignore`.
-Commit `.ai/memory/` — it's your project's living knowledge base.
+Add to your `.gitignore`:
+
+```gitignore
+# DevMemory — commit memory/, ignore generated files
+.ai/history/
+.ai/embeddings/
+.ai/memory/context.md   ← generated on each inject, not worth committing
+```
+
+Commit `.ai/memory/*.md` (except `context.md`) — they are your project's living knowledge base.
 
 ---
 
@@ -157,62 +265,13 @@ Commit `.ai/memory/` — it's your project's living knowledge base.
 
 ---
 
-## Memory files
-
-Memory is plain Markdown — you can read, edit, or delete entries manually.
-
-**`.ai/memory/architecture.md`**
-```markdown
-# Architecture
-
-- Uses Commander.js for CLI with a single main command that wraps Claude sessions
-- Session recorder reads JSONL files from ~/.claude/projects/<encoded-path>/
-- Memory stored as Markdown files in .ai/memory/, one per type
-```
-
-**`.ai/memory/decisions.md`**
-```markdown
-# Decisions
-
-- Chose Postgres over SQLite for the main store because the team is already familiar with it
-- API uses REST not GraphQL — complexity not justified for current feature set
-```
-
-**`.ai/memory/bugs.md`**
-```markdown
-# Bugs
-
-- Auth token was not being refreshed on 401; fixed by adding interceptor in api-client.ts
-- Race condition in job queue when two workers picked the same task; fixed with SELECT FOR UPDATE
-```
-
-**`.ai/memory/learnings.md`**
-```markdown
-# Learnings
-
-- The staging environment uses a different S3 bucket region — always check AWS_REGION when debugging uploads
-- Running migrations without --transaction flag caused partial state on failures; always use --transaction
-```
-
----
-
-## Recommended `.gitignore`
-
-```gitignore
-# DevMemory — commit memory/, ignore generated files
-.ai/history/
-.ai/embeddings/
-```
-
----
-
 ## How memory compilation works
 
-When a session ends, DevMemory runs a two-phase pipeline using the Claude API:
+When a session ends (CLI: automatically; extension: via `dev-memory compile`), DevMemory runs a two-phase pipeline:
 
 **Phase 1 — Summarize**
 
-The raw session transcript (filtered to user/assistant text, max 100K chars) is sent to Claude with a prompt that produces a 150–300 word technical summary of what happened.
+The raw session transcript (user/assistant text only, max 100K chars) is sent to Claude, producing a 150–300 word technical summary.
 
 **Phase 2 — Extract**
 
@@ -235,6 +294,10 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 Claude exited before writing any messages (e.g. immediate Ctrl+C). Nothing to compile.
 
+**`No new sessions found — already up to date`** (from `dev-memory compile`)
+
+All session transcripts in `~/.claude/projects/<your-project>/` have already been compiled. This is the expected message after the first `compile` if no new extension session has run since then.
+
 **`better-sqlite3 failed to load`**
 
 On macOS, ensure Xcode Command Line Tools are installed:
@@ -245,9 +308,10 @@ Then reinstall: `pnpm install`
 
 **Memory not loading for a project**
 
-Check that you're running `dev-memory` from the same directory as `.ai/`. Use `--project-dir` to point to the right root:
+Check that you're running from the same directory as `.ai/`. Use `--project-dir` to point to the right root:
 ```bash
-dev-memory --project-dir /path/to/your/project
+dev-memory inject --project-dir /path/to/your/project
+dev-memory compile --project-dir /path/to/your/project
 ```
 
 **Claude binary not found**
