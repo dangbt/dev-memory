@@ -12,7 +12,7 @@
     "build": "tsc"
   },
   "keywords": ["claude", "ai", "memory", "cli", "developer-tools"],
-  "author": "Bui Tan Dang <buitandang@gmail.com> (https://github.com/dangbt)",
+  "author": "Bui Tan Dang <buitandang96@gmail.com> (https://github.com/dangbt)",
   "repository": {
     "type": "git",
     "url": "https://github.com/dangbt/dev-memory"
