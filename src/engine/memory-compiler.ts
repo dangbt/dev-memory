@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { execa } from 'execa';
 import { MemoryStore, MemoryType, MEMORY_TYPES } from '../storage/memory-store.js';
 import { VectorRetriever } from './vector-retriever.js';
 import { SessionMessage } from './session-recorder.js';
@@ -21,17 +21,14 @@ export interface ExtractedKnowledge {
  *   Summary + existing memory → structured JSON with categorised knowledge entries
  *   Categories: architecture | decisions | bugs | learnings
  *
- * Uses @anthropic-ai/sdk directly (no LangChain) for minimal dependencies.
- * Requires ANTHROPIC_API_KEY in the environment.
+ * Uses the Claude CLI binary (claude -p) — no API key required, only CLI login.
  */
 export class MemoryCompiler {
-  private client: Anthropic;
   private memoryStore: MemoryStore;
   private retriever: VectorRetriever;
   private model: string;
 
   constructor(projectRoot: string = process.cwd(), model = 'claude-sonnet-4-6') {
-    this.client = new Anthropic();
     this.memoryStore = new MemoryStore(projectRoot);
     this.retriever = new VectorRetriever(projectRoot);
     this.model = model;
@@ -91,43 +88,47 @@ export class MemoryCompiler {
   // Private: LLM pipeline phases
   // ---------------------------------------------------------------------------
 
+  private async runClaude(prompt: string): Promise<string> {
+    const claudeBin = await this.resolveClaudeBin();
+    const env = { ...process.env };
+    delete env['CLAUDECODE'];
+    delete env['CLAUDE_CODE_ENTRYPOINT'];
+    const { stdout } = await execa(claudeBin, [
+      '--print',
+      '--model', this.model,
+      '--output-format', 'text',
+      prompt,
+    ], { env, extendEnv: false });
+    return stdout;
+  }
+
+  private async resolveClaudeBin(): Promise<string> {
+    try {
+      const { stdout } = await execa('bash', ['-c', 'type -P claude']);
+      return stdout.trim() || 'claude';
+    } catch {
+      return 'claude';
+    }
+  }
+
   private async summarize(transcript: string): Promise<string> {
     const prompt = SUMMARIZE_PROMPT.replace('{{TRANSCRIPT}}', transcript);
-
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    return response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map(b => b.text)
-      .join('');
+    return this.runClaude(prompt);
   }
 
   private async extractKnowledge(
     summary: string,
     existingMemory: string
   ): Promise<ExtractedKnowledge> {
-    const prompt = EXTRACT_KNOWLEDGE_PROMPT
+    const systemInstruction =
+      'You are a knowledge extraction system. ' +
+      'Respond ONLY with valid JSON. No markdown fences, no explanation.\n\n';
+
+    const prompt = systemInstruction + EXTRACT_KNOWLEDGE_PROMPT
       .replace('{{SUMMARY}}', summary)
       .replace('{{EXISTING_MEMORY}}', existingMemory || 'No existing memory yet.');
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 2048,
-      system:
-        'You are a knowledge extraction system. ' +
-        'Respond ONLY with valid JSON. No markdown fences, no explanation.',
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
+    const text = await this.runClaude(prompt);
     return this.parseResponse(text);
   }
 

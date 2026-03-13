@@ -78,11 +78,6 @@ program
 
     await initAiDir(projectRoot);
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      log('error', 'ANTHROPIC_API_KEY not set — memory compilation requires the Anthropic API');
-      process.exit(1);
-    }
-
     const recorder = new SessionRecorder(projectRoot);
     await recorder.init();
 
@@ -183,11 +178,6 @@ async function runSession(
   const projectRoot = path.resolve(opts.projectDir);
 
   await initAiDir(projectRoot);
-
-  if (!process.env.ANTHROPIC_API_KEY && opts.compile) {
-    log('warn', 'ANTHROPIC_API_KEY not set — memory compilation will be skipped after the session');
-    opts.compile = false;
-  }
 
   let appendSystemPrompt = '';
 
